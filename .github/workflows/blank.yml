@@ -18,9 +18,15 @@ jobs:
           Z=$(find . -iname '*.zip' | head -1)
           if [ -n "$Z" ]; then mkdir -p proj; unzip -q -o "$Z" -d proj; fi
           S=$(find . -name settings.gradle.kts | head -1)
-          if [ -z "$S" ]; then echo "PROJETO NAO ENCONTRADO"; ls -R | head -40; exit 1; fi
+          if [ -z "$S" ]; then echo "::error::PROJETO NAO ENCONTRADO"; exit 1; fi
           cd "$(dirname "$S")"
-          gradle assembleDebug --no-daemon
+          set +e
+          gradle assembleDebug --no-daemon > "$GITHUB_WORKSPACE/build.log" 2>&1
+          R=$?
+          if [ $R -ne 0 ]; then
+            { echo '### Erros do build'; echo '```'; grep -E "^e: |What went wrong|error:|Could not" -A3 "$GITHUB_WORKSPACE/build.log" | head -45; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
           mkdir -p "$GITHUB_WORKSPACE/out"
           cp app/build/outputs/apk/debug/*.apk "$GITHUB_WORKSPACE/out/"
       - uses: actions/upload-artifact@v4
